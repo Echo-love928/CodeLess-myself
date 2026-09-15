@@ -1,13 +1,12 @@
-package com.hjq.CodeLess.model.dto;
-
-import lombok.Data;
+package com.hjq.CodeLess.model.dto.user;
 
 import java.io.Serializable;
 
+import lombok.Data;
 @Data
 public class UserRegisterRequest implements Serializable {
 
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 3191241716373120793L;
 
     /**
      * 账号
