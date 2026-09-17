@@ -1,5 +1,7 @@
 package com.hjq.CodeLess.ai;
 
+import com.hjq.CodeLess.ai.model.HtmlCodeResult;
+import com.hjq.CodeLess.ai.model.MultiFileCodeResult;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -15,13 +17,14 @@ class AiCodeGeneratorServiceTest {
 
     @Test
     void generateHtmlCode() {
-        String result = aiCodeGeneratorService.generateHtmlCode("做个hjq的工作记录小工具");
+        HtmlCodeResult result = aiCodeGeneratorService.generateHtmlCode("做个hjq的工作记录小工具");
         Assertions.assertNotNull(result);
     }
 
     @Test
     void generateMultiFileCode() {
-        String multiFileCode = aiCodeGeneratorService.generateMultiFileCode("做个hjq的留言板");
+        MultiFileCodeResult multiFileCode = aiCodeGeneratorService.generateMultiFileCode("做个hjq的留言板");
         Assertions.assertNotNull(multiFileCode);
     }
+
 }
