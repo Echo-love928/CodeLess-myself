@@ -31,8 +31,9 @@ class AiCodeGeneratorFacadeTest {
         List<String> result = codeStream.collectList().block();
         // 验证结果
         Assertions.assertNotNull(result);
+        Assertions.assertFalse(result.isEmpty());
         String completeContent = String.join("", result);
-        Assertions.assertNotNull(completeContent);
+        Assertions.assertFalse(completeContent.isBlank());
     }
 
 }
