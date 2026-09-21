@@ -2,6 +2,17 @@
 application-local.yml
 tmp
 
+# Local environment and private credentials
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+
 
 HELP.md
 target/
