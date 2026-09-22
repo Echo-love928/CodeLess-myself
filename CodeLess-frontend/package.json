@@ -6,10 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "run-p type-check \"build-only {@}\" --",
+    "check:id-precision": "node scripts/check-id-precision.mjs",
     "openapi2ts": "openapi2ts",
     "preview": "vite preview",
     "build-only": "vite build",
-    "type-check": "vue-tsc --build",
+    "type-check": "npm run check:id-precision && vue-tsc --build",
     "lint": "eslint . --fix",
     "format": "prettier --write src/"
   },
