@@ -90,22 +90,21 @@ public class AiCodeGeneratorFacade {
      * @return 流式响应
      */
     private Flux<String> processCodeStream(Flux<String> codeStream, CodeGenTypeEnum codeGenType, Long appId) {
-        StringBuilder codeBuilder = new StringBuilder();
-        return codeStream.doOnNext(chunk -> {
-            // 实时收集代码片段
-            codeBuilder.append(chunk);
-        }).doOnComplete(() -> {
-            // 流式返回完成后保存代码
-            try {
+        return Flux.defer(() -> {
+            StringBuilder codeBuilder = new StringBuilder();
+            return codeStream.doOnNext(codeBuilder::append).concatWith(Flux.defer(() -> {
+                try {
+                    // 只有文件保存成功，响应流才算正常完成。
                 String completeCode = codeBuilder.toString();
-                // 使用执行器解析代码
                 Object parsedResult = CodeParserExecutor.executeParser(completeCode, codeGenType);
-                // 使用执行器保存代码
                 File savedDir = CodeFileSaverExecutor.executeSaver(parsedResult, codeGenType, appId);
                 log.info("保存成功，路径为：" + savedDir.getAbsolutePath());
-            } catch (Exception e) {
-                log.error("保存失败: {}", e.getMessage());
-            }
+                    return Flux.empty();
+                } catch (Exception e) {
+                    log.error("保存失败", e);
+                    return Flux.error(new BusinessException(ErrorCode.SYSTEM_ERROR, "代码保存失败：" + e.getMessage()));
+                }
+            }));
         });
     }
 

@@ -83,6 +83,14 @@ public class AppController {
                                 .event("done")
                                 .data("")
                                 .build()
+                ))
+                .onErrorResume(error -> Flux.just(
+                        ServerSentEvent.<String>builder()
+                                .event("error")
+                                .data(JSONUtil.toJsonStr(Map.of(
+                                        "message", error.getMessage() == null ? "代码生成失败" : error.getMessage()
+                                )))
+                                .build()
                 ));
     }
 

@@ -1,7 +1,6 @@
 package com.hjq.CodeLess.core.saver;
 
 import cn.hutool.core.io.FileUtil;
-import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import com.hjq.CodeLess.constant.AppConstant;
 import com.hjq.CodeLess.exception.BusinessException;
@@ -62,7 +61,8 @@ public abstract class CodeFileSaverTemplate<T> {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "应用ID不能为空");
         }
         String codeType = getCodeType().getValue();
-        String uniqueDirName = StrUtil.format("{}_{}", codeType, IdUtil.getSnowflakeNextIdStr());
+        // 预览地址按 codeGenType_appId 定位，保存目录必须使用传入的应用 ID。
+        String uniqueDirName = StrUtil.format("{}_{}", codeType, appId);
         String dirPath = FILE_SAVE_ROOT_DIR + File.separator + uniqueDirName;
         FileUtil.mkdir(dirPath);
         return dirPath;

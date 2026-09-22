@@ -19,7 +19,7 @@ type NavigationItem = {
 // 在这里集中维护导航项，新增页面时只需补充一条配置。
 const navigationItems: NavigationItem[] = [
   { key: 'home', label: '首页', path: '/' },
-  { key: 'about', label: '关于我们', path: '/about' },
+  { key: 'appManage', label: '应用管理', path: '/admin/appManage' },
   { key: 'userManage', label: '用户管理', path: '/admin/userManage' },
 ]
 

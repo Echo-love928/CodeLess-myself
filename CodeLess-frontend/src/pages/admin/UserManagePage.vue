@@ -127,7 +127,7 @@ const doSearch = () => {
 }
 
 // 删除数据
-const doDelete = async (id: string) => {
+const doDelete = async (id?: string) => {
   if (!id) {
     return
   }
