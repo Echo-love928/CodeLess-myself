@@ -18,12 +18,16 @@ import com.hjq.CodeLess.model.enums.CodeGenTypeEnum;
 import com.hjq.CodeLess.model.vo.AppVO;
 import com.hjq.CodeLess.model.vo.UserVO;
 import com.hjq.CodeLess.service.AppService;
+import com.hjq.CodeLess.service.AppCoverGeneratorService;
 import com.hjq.CodeLess.service.UserService;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.File;
 import java.time.LocalDateTime;
@@ -39,6 +43,7 @@ import java.util.stream.Collectors;
  * @author <a href="https://github.com/Echo-love928?tab=repositories">CodeLess</a>
  */
 @Service
+@Slf4j
 public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppService {
 
     @Resource
@@ -46,6 +51,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
 
     @Resource
     private AiCodeGeneratorFacade aiCodeGeneratorFacade;
+
+    @Resource
+    private AppCoverGeneratorService appCoverGeneratorService;
 
     @Override
     public Flux<String> chatToGenCode(Long appId, String message, User loginUser) {
@@ -66,7 +74,34 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "不支持的代码生成类型");
         }
         // 5. 调用 AI 生成代码
-        return aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenTypeEnum, appId);
+        Flux<String> codeStream = aiCodeGeneratorFacade.generateAndSaveCodeStream(
+                message, codeGenTypeEnum, appId);
+        // 保存代码成功后再截图；使用弹性线程池，避免阻塞响应式处理线程。
+        Mono<String> coverTask = Mono.<String>fromCallable(() -> {
+                    generateAndSaveAppCover(appId, codeGenTypeStr);
+                    return null;
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+        return codeStream.concatWith(coverTask);
+    }
+
+    /**
+     * 生成应用封面并更新数据库。封面失败不应让代码生成失败。
+     */
+    private void generateAndSaveAppCover(Long appId, String codeGenType) {
+        try {
+            appCoverGeneratorService.generateCover(appId, codeGenType).ifPresent(coverUrl -> {
+                App updateApp = new App();
+                updateApp.setId(appId);
+                updateApp.setCover(coverUrl);
+                boolean updated = this.updateById(updateApp);
+                if (!updated) {
+                    log.warn("应用 {} 封面已生成，但数据库 cover 字段更新失败", appId);
+                }
+            });
+        } catch (Exception e) {
+            log.warn("应用 {} 自动封面处理失败：{}", appId, e.getMessage(), e);
+        }
     }
 
     @Override

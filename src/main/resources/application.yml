@@ -15,6 +15,18 @@ server:
   servlet:
     context-path: /api
 
+# 应用封面自动截图
+app:
+  cover:
+    enabled: true
+    preview-base-url: http://localhost:${server.port}${server.servlet.context-path}/static
+    # 如未配置会自动查找本机 Chrome 或 Edge，也可通过 BROWSER_PATH 环境变量指定
+    browser-path: ${BROWSER_PATH:}
+    width: 1200
+    height: 675
+    timeout-seconds: 20
+    render-wait-millis: 3000
+
 #springdoc-openapi
 springdoc:
   group-configs:
