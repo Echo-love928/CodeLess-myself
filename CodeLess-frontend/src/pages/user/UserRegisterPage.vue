@@ -3,6 +3,7 @@ import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { userRegister } from '@/api/userController.ts'
+import AuthFormShell from '@/components/AuthFormShell.vue'
 
 const router = useRouter()
 const submitting = ref(false)
@@ -49,9 +50,7 @@ const handleSubmit = async (values: API.UserRegisterRequest) => {
 </script>
 
 <template>
-  <div id="userRegisterPage">
-    <h2 class="title">CodeLess - 用户注册</h2>
-    <div class="desc">不写一行代码，生成完整应用</div>
+  <AuthFormShell title="CodeLess - 用户注册">
     <a-form :model="formState" name="basic" autocomplete="off" @finish="handleSubmit">
       <a-form-item
         name="userAccount"
@@ -87,30 +86,5 @@ const handleSubmit = async (values: API.UserRegisterRequest) => {
         </a-button>
       </a-form-item>
     </a-form>
-  </div>
+  </AuthFormShell>
 </template>
-
-<style>
-#userRegisterPage {
-  max-width: 360px;
-  margin: 0 auto;
-}
-
-.title {
-  text-align: center;
-  margin-bottom: 16px;
-}
-
-.desc {
-  text-align: center;
-  color: #bbb;
-  margin-bottom: 16px;
-}
-
-.tips {
-  margin-bottom: 16px;
-  color: #bbb;
-  font-size: 13px;
-  text-align: right;
-}
-</style>

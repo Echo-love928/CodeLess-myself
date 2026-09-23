@@ -24,6 +24,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import com.hjq.CodeLess.model.entity.User;
 import com.hjq.CodeLess.service.UserService;
+import com.hjq.CodeLess.service.UserAvatarService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
@@ -37,6 +41,9 @@ public class UserController {
 
     @Resource
     private UserService userService;
+
+    @Resource
+    private UserAvatarService userAvatarService;
 
     /**
      * 用户注册
@@ -165,6 +172,19 @@ public class UserController {
         ThrowUtils.throwIf(userUpdateMyRequest == null, ErrorCode.PARAMS_ERROR);
         boolean result = userService.updateMyProfile(userUpdateMyRequest, request);
         return ResultUtils.success(result);
+    }
+
+    /** 上传头像并立即保存到当前登录用户。 */
+    @PostMapping("/avatar/upload")
+    public BaseResponse<String> uploadMyAvatar(@RequestParam("file") MultipartFile file,
+                                               HttpServletRequest request) {
+        return ResultUtils.success(userAvatarService.uploadAndSave(file, request));
+    }
+
+    /** 头像为公开图片资源，文件名仅允许服务端生成的随机名称。 */
+    @GetMapping("/avatar/{fileName:.+}")
+    public ResponseEntity<org.springframework.core.io.Resource> getAvatar(@PathVariable String fileName) {
+        return userAvatarService.getAvatar(fileName);
     }
 
     /**

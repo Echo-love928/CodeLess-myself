@@ -2,27 +2,64 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
-import {
-  ArrowRightOutlined,
-  BulbOutlined,
-  ClockCircleOutlined,
-  EyeOutlined,
-  MessageOutlined,
-  SearchOutlined,
-} from '@ant-design/icons-vue'
+import { ArrowRightOutlined, BulbOutlined, SearchOutlined } from '@ant-design/icons-vue'
+import AppCard from '@/components/AppCard.vue'
 import { addApp, listGoodAppVoByPage, listMyAppVoByPage } from '@/api/appController'
 import { useLoginUserStore } from '@/stores/loginUser'
+import { getDeployUrl } from '@/config/urls'
 
 const router = useRouter()
 const loginUserStore = useLoginUserStore()
 const prompt = ref('')
 const creating = ref(false)
 const activePrompt = ref('')
-const DEPLOY_BASE_URL = (import.meta.env.VITE_DEPLOY_BASE_URL || 'http://localhost:9090').replace(/\/+$/, '')
+const suggestions = [
+  {
+    title: '个人作品集',
+    prompt:
+      '帮我创建一个个人作品集网站，首页展示姓名、职业定位和一句简短介绍；设置关于我、精选项目、技能清单和联系方式。每个项目有封面、简介和详情入口，支持按类别筛选。整体风格简洁现代，手机和电脑上都要清晰易用，并突出联系按钮。',
+  },
+  {
+    title: '个人博客',
+    prompt:
+      '帮我创建一个个人博客网站，首页展示最新文章和作者简介，提供文章分类、关键词搜索、文章详情和阅读时间。详情页要有清晰的标题层级、目录和上一篇下一篇入口。整体采用舒适的阅读排版与柔和配色，适配手机屏幕，并预留订阅和联系方式。',
+  },
+  {
+    title: '咖啡馆官网',
+    prompt:
+      '帮我创建一个咖啡馆官网，首页突出店名、品牌故事和主打饮品，包含菜单展示、门店环境、营业时间、地址地图和预约入口。菜单按咖啡、甜点分类，展示图片、价格和简短介绍。视觉风格温暖精致，按钮清晰，移动端也能方便查看位置并联系门店。',
+  },
+  {
+    title: '商品展示网站',
+    prompt:
+      '帮我创建一个小型商品展示网站，首页有品牌介绍、主推商品和分类导航；商品列表支持筛选与搜索，详情页展示图片、价格、规格和购买说明。加入购物车交互和空状态提示，结算部分先用演示流程。整体风格简洁可信，兼顾手机和电脑的浏览体验。',
+  },
+] as const
 
-type AppListState = { records: API.AppVO[]; total: number; loading: boolean; pageNum: number; pageSize: number; appName: string }
-const myApps = reactive<AppListState>({ records: [], total: 0, loading: false, pageNum: 1, pageSize: 6, appName: '' })
-const goodApps = reactive<AppListState>({ records: [], total: 0, loading: false, pageNum: 1, pageSize: 6, appName: '' })
+type AppListState = {
+  records: API.AppVO[]
+  total: number
+  loading: boolean
+  pageNum: number
+  pageSize: number
+  appName: string
+}
+const myApps = reactive<AppListState>({
+  records: [],
+  total: 0,
+  loading: false,
+  pageNum: 1,
+  pageSize: 6,
+  appName: '',
+})
+const goodApps = reactive<AppListState>({
+  records: [],
+  total: 0,
+  loading: false,
+  pageNum: 1,
+  pageSize: 6,
+  appName: '',
+})
 const isLoggedIn = computed(() => Boolean(loginUserStore.loginUser.id))
 
 const createApp = async () => {
@@ -39,122 +76,496 @@ const createApp = async () => {
     if (res.data.code === 0 && res.data.data) {
       await router.push({ path: `/app/chat/${res.data.data}`, query: { auto: '1' } })
     } else message.error(`创建失败：${res.data.message || '请稍后重试'}`)
-  } catch { message.error('创建失败，请检查后端服务是否正常') }
-  finally { creating.value = false }
+  } catch {
+    message.error('创建失败，请检查后端服务是否正常')
+  } finally {
+    creating.value = false
+  }
 }
 
-const useSuggestion = (value: string) => {
-  prompt.value = `创建一个设计精致的${value}`
-  activePrompt.value = value
+const useSuggestion = (item: (typeof suggestions)[number]) => {
+  prompt.value = item.prompt
+  activePrompt.value = item.title
 }
 
 const loadMyApps = async () => {
-  if (!isLoggedIn.value) { myApps.records = []; myApps.total = 0; return }
+  if (!isLoggedIn.value) {
+    myApps.records = []
+    myApps.total = 0
+    return
+  }
   myApps.loading = true
   try {
-    const res = await listMyAppVoByPage({ pageNum: myApps.pageNum, pageSize: Math.min(myApps.pageSize, 20), appName: myApps.appName || undefined, sortField: 'createTime', sortOrder: 'descend' })
-    if (res.data.code === 0 && res.data.data) { myApps.records = res.data.data.records ?? []; myApps.total = res.data.data.totalRow ?? 0 }
-    else message.error(`获取我的应用失败：${res.data.message || '未知错误'}`)
-  } catch { message.error('获取我的应用失败') }
-  finally { myApps.loading = false }
+    const res = await listMyAppVoByPage({
+      pageNum: myApps.pageNum,
+      pageSize: Math.min(myApps.pageSize, 20),
+      appName: myApps.appName || undefined,
+      sortField: 'createTime',
+      sortOrder: 'descend',
+    })
+    if (res.data.code === 0 && res.data.data) {
+      myApps.records = res.data.data.records ?? []
+      myApps.total = res.data.data.totalRow ?? 0
+    } else message.error(`获取我的应用失败：${res.data.message || '未知错误'}`)
+  } catch {
+    message.error('获取我的应用失败')
+  } finally {
+    myApps.loading = false
+  }
 }
 
 const loadGoodApps = async () => {
   goodApps.loading = true
   try {
-    const res = await listGoodAppVoByPage({ pageNum: goodApps.pageNum, pageSize: Math.min(goodApps.pageSize, 20), appName: goodApps.appName || undefined, sortField: 'priority', sortOrder: 'descend' })
-    if (res.data.code === 0 && res.data.data) { goodApps.records = res.data.data.records ?? []; goodApps.total = res.data.data.totalRow ?? 0 }
-    else message.error(`获取精选应用失败：${res.data.message || '未知错误'}`)
-  } catch { message.error('获取精选应用失败') }
-  finally { goodApps.loading = false }
+    const res = await listGoodAppVoByPage({
+      pageNum: goodApps.pageNum,
+      pageSize: Math.min(goodApps.pageSize, 20),
+      appName: goodApps.appName || undefined,
+      sortField: 'priority',
+      sortOrder: 'descend',
+    })
+    if (res.data.code === 0 && res.data.data) {
+      goodApps.records = res.data.data.records ?? []
+      goodApps.total = res.data.data.totalRow ?? 0
+    } else message.error(`获取精选应用失败：${res.data.message || '未知错误'}`)
+  } catch {
+    message.error('获取精选应用失败')
+  } finally {
+    goodApps.loading = false
+  }
 }
 
-const searchApps = (target: AppListState, loader: () => Promise<void>) => { target.pageNum = 1; void loader() }
+const searchApps = (target: AppListState, loader: () => Promise<void>) => {
+  target.pageNum = 1
+  void loader()
+}
 const openConversation = (app: API.AppVO) => {
   if (app.id) void router.push({ path: `/app/chat/${app.id}`, query: { view: '1' } })
 }
 const openDeployedApp = (app: API.AppVO) => {
   const deployKey = app.deployKey?.trim()
   if (!deployKey) return
-  window.open(
-    `${DEPLOY_BASE_URL}/${encodeURIComponent(deployKey)}/`,
-    '_blank',
-    'noopener,noreferrer',
-  )
+  window.open(getDeployUrl(deployKey), '_blank', 'noopener,noreferrer')
 }
-const formatDate = (value?: string) => value ? new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' }).format(new Date(value)) : '刚刚创建'
-
 onMounted(() => void Promise.all([loadMyApps(), loadGoodApps()]))
 </script>
 
 <template>
   <main class="home-page">
     <section class="hero" aria-labelledby="hero-title">
-      <div class="hero__glow hero__glow--one" /><div class="hero__glow hero__glow--two" />
+      <div class="hero__glow hero__glow--one" />
+      <div class="hero__glow hero__glow--two" />
       <div class="hero__content">
-        <div class="hero__eyebrow"><BulbOutlined /> AI 网站工坊</div>
-        <h1 id="hero-title">一句话，<span>让创意成为网站</span></h1>
+        <h1 id="hero-title">AI 应用生成平台</h1>
         <p>描述你的想法，CodeLess 会帮你生成、预览并部署一个真实可访问的网站。</p>
         <div class="prompt-box">
-          <a-textarea v-model:value="prompt" class="prompt-box__input" :maxlength="1000" :auto-size="{ minRows: 4, maxRows: 8 }" placeholder="例如：创建一个极简风格的个人作品集，包含项目展示、个人介绍和联系方式……" @press-enter.exact.prevent="createApp" />
+          <a-textarea
+            v-model:value="prompt"
+            class="prompt-box__input"
+            :maxlength="1000"
+            :auto-size="{ minRows: 4, maxRows: 8 }"
+            placeholder="帮我创作建个人作品集"
+            @press-enter.exact.prevent="createApp"
+          />
           <div class="prompt-box__footer">
             <span>Enter 发送 · 详细描述会让结果更准确</span>
-            <a-button type="primary" shape="circle" size="large" :loading="creating" aria-label="开始创建" @click="createApp"><template #icon><ArrowRightOutlined /></template></a-button>
+            <a-button
+              type="primary"
+              shape="circle"
+              size="large"
+              :loading="creating"
+              aria-label="开始创建"
+              @click="createApp"
+              ><template #icon><ArrowRightOutlined /></template
+            ></a-button>
           </div>
         </div>
         <div class="suggestions" aria-label="提示词示例">
-          <button v-for="item in ['个人作品集', '咖啡馆官网', '旅行计划工具', '产品落地页']" :key="item" type="button" :class="{ active: activePrompt === item }" @click="useSuggestion(item)">{{ item }}</button>
+          <button
+            v-for="item in suggestions"
+            :key="item.title"
+            type="button"
+            :class="{ active: activePrompt === item.title }"
+            @click="useSuggestion(item)"
+          >
+            {{ item.title }}
+          </button>
         </div>
       </div>
     </section>
 
     <section class="app-section" aria-labelledby="my-apps-title">
-      <div class="section-heading"><div><span>01 / YOUR WORK</span><h2 id="my-apps-title">我的应用</h2><p>继续打磨你创建的网站</p></div><a-input-search v-if="isLoggedIn" v-model:value="myApps.appName" class="app-search" placeholder="按名称搜索" allow-clear @search="searchApps(myApps, loadMyApps)" /></div>
+      <div class="section-heading">
+        <div>
+          <h2 id="my-apps-title">我的应用</h2>
+          <p>继续打磨你创建的网站</p>
+        </div>
+        <a-input-search
+          v-if="isLoggedIn"
+          v-model:value="myApps.appName"
+          class="app-search"
+          placeholder="按名称搜索"
+          allow-clear
+          @search="searchApps(myApps, loadMyApps)"
+        />
+      </div>
       <a-spin :spinning="myApps.loading">
-        <div v-if="!isLoggedIn" class="empty-state"><div class="empty-state__icon"><BulbOutlined /></div><h3>登录后保存你的每一次创作</h3><p>创建、管理和部署网站都需要先登录。</p><a-button type="primary" @click="router.push('/user/login')">前往登录</a-button></div>
+        <div v-if="!isLoggedIn" class="empty-state">
+          <div class="empty-state__icon"><BulbOutlined /></div>
+          <h3>登录后保存你的每一次创作</h3>
+          <p>创建、管理和部署网站都需要先登录。</p>
+          <a-button type="primary" @click="router.push('/user/login')">前往登录</a-button>
+        </div>
         <div v-else-if="myApps.records.length" class="app-grid">
-          <article v-for="app in myApps.records" :key="app.id" class="app-card">
-            <div class="app-card__cover">
-              <img v-if="app.cover" :src="app.cover" :alt="`${app.appName || '应用'}封面`" />
-              <div v-else class="app-card__placeholder"><span>{{ app.appName?.slice(0, 1) || 'C' }}</span><small>CODELESS PREVIEW</small></div>
-              <b>{{ app.codeGenType || 'AI 网站' }}</b>
-              <div class="app-card__actions" aria-label="应用操作">
-                <button v-if="app.deployKey?.trim()" class="card-action card-action--work" type="button" @click="openDeployedApp(app)"><EyeOutlined />查看作品</button>
-                <button class="card-action card-action--chat" type="button" @click="openConversation(app)"><MessageOutlined />查看对话</button>
-              </div>
-            </div>
-            <div class="app-card__body"><h3>{{ app.appName || '未命名应用' }}</h3><p>{{ app.initPrompt || '继续与 AI 对话来完善这个应用' }}</p><span><ClockCircleOutlined /> {{ formatDate(app.createTime) }}</span></div>
-          </article>
+          <AppCard
+            v-for="app in myApps.records"
+            :key="app.id"
+            :app="app"
+            @view-conversation="openConversation"
+            @view-work="openDeployedApp"
+          />
         </div>
         <a-empty v-else description="还没有应用，从上方输入一句话开始创建吧" />
       </a-spin>
-      <a-pagination v-if="myApps.total > myApps.pageSize" v-model:current="myApps.pageNum" :page-size="myApps.pageSize" :total="myApps.total" :show-size-changer="false" @change="loadMyApps" />
+      <a-pagination
+        v-if="myApps.total > myApps.pageSize"
+        v-model:current="myApps.pageNum"
+        :page-size="myApps.pageSize"
+        :total="myApps.total"
+        :show-size-changer="false"
+        @change="loadMyApps"
+      />
     </section>
 
     <section class="app-section app-section--featured" aria-labelledby="good-apps-title">
-      <div class="section-heading"><div><span>02 / INSPIRATION</span><h2 id="good-apps-title">精选应用</h2><p>看看社区里正在发生的好创意</p></div><a-input-search v-model:value="goodApps.appName" class="app-search" placeholder="搜索精选应用" allow-clear @search="searchApps(goodApps, loadGoodApps)"><template #enterButton><SearchOutlined /></template></a-input-search></div>
+      <div class="section-heading">
+        <div>
+          <h2 id="good-apps-title">精选应用</h2>
+          <p>看看社区里正在发生的好创意</p>
+        </div>
+        <a-input-search
+          v-model:value="goodApps.appName"
+          class="app-search"
+          placeholder="搜索精选应用"
+          allow-clear
+          @search="searchApps(goodApps, loadGoodApps)"
+          ><template #enterButton><SearchOutlined /></template
+        ></a-input-search>
+      </div>
       <a-spin :spinning="goodApps.loading">
         <div v-if="goodApps.records.length" class="app-grid">
-          <article v-for="app in goodApps.records" :key="app.id" class="app-card">
-            <div class="app-card__cover">
-              <img v-if="app.cover" :src="app.cover" :alt="`${app.appName || '应用'}封面`" />
-              <div v-else class="app-card__placeholder featured"><span>{{ app.appName?.slice(0, 1) || '精' }}</span><small>FEATURED BUILD</small></div>
-              <b class="featured-tag">精选</b>
-              <div class="app-card__actions" aria-label="应用操作">
-                <button v-if="app.deployKey?.trim()" class="card-action card-action--work" type="button" @click="openDeployedApp(app)"><EyeOutlined />查看作品</button>
-                <button class="card-action card-action--chat" type="button" @click="openConversation(app)"><MessageOutlined />查看对话</button>
-              </div>
-            </div>
-            <div class="app-card__body"><h3>{{ app.appName || '未命名应用' }}</h3><p>{{ app.initPrompt || '一个由 AI 创作的精选网站' }}</p><span>{{ app.user?.userName || 'CodeLess 创作者' }}</span></div>
-          </article>
+          <AppCard
+            v-for="app in goodApps.records"
+            :key="app.id"
+            :app="app"
+            featured
+            @view-conversation="openConversation"
+            @view-work="openDeployedApp"
+          />
         </div>
         <a-empty v-else description="暂时还没有精选应用" />
       </a-spin>
-      <a-pagination v-if="goodApps.total > goodApps.pageSize" v-model:current="goodApps.pageNum" :page-size="goodApps.pageSize" :total="goodApps.total" :show-size-changer="false" @change="loadGoodApps" />
+      <a-pagination
+        v-if="goodApps.total > goodApps.pageSize"
+        v-model:current="goodApps.pageNum"
+        :page-size="goodApps.pageSize"
+        :total="goodApps.total"
+        :show-size-changer="false"
+        @change="loadGoodApps"
+      />
     </section>
   </main>
 </template>
 
 <style scoped>
-.home-page{--ink:#14213d;--muted:#68758d;color:var(--ink)}.hero{position:relative;min-height:510px;overflow:hidden;border:1px solid #ffffffcc;border-radius:32px;background:linear-gradient(135deg,#ffffffef,#f2fffcdf 48%,#e2f4ffeb);box-shadow:0 30px 70px #336da31f}.hero:after{position:absolute;right:-8%;bottom:-44%;width:65%;height:75%;border-radius:50%;background:repeating-radial-gradient(circle,transparent 0 14px,#2563eb0d 15px 16px);content:''}.hero__glow{position:absolute;border-radius:50%;filter:blur(12px)}.hero__glow--one{top:-140px;right:5%;width:380px;height:380px;background:#3de0c240}.hero__glow--two{bottom:-180px;left:0;width:430px;height:430px;background:#49a0ff33}.hero__content{position:relative;z-index:1;width:min(820px,calc(100% - 48px));margin:auto;padding:64px 0 54px;text-align:center}.hero__eyebrow{display:inline-flex;padding:7px 13px;align-items:center;gap:7px;border:1px solid #15a7932e;border-radius:999px;background:#ffffffb3;color:#148679;font-size:12px;font-weight:700;letter-spacing:.12em}.hero h1{margin:18px 0 8px;font-family:STKaiti,KaiTi,"Songti SC",serif;font-size:clamp(38px,5vw,62px);font-weight:800;letter-spacing:-.04em;line-height:1.14}.hero h1 span{background:linear-gradient(100deg,#0e8f85,#2563eb 72%);background-clip:text;color:transparent}.hero__content>p{margin:0 0 30px;color:var(--muted);font-size:16px}.prompt-box{padding:12px 14px 12px 18px;border:1px solid #7b97b933;border-radius:22px;background:#fffffff0;box-shadow:0 20px 50px #38629329;text-align:left;transition:.18s}.prompt-box:focus-within{box-shadow:0 24px 60px #2563eb33;transform:translateY(-2px)}.prompt-box__input,.prompt-box__input:focus{padding:6px 2px;border:0;background:transparent;box-shadow:none;font-size:16px;resize:none}.prompt-box__footer{display:flex;align-items:center;justify-content:space-between;color:#99a4b6;font-size:12px}.prompt-box__footer :deep(.ant-btn){border:0;background:linear-gradient(135deg,#14b8a6,#2563eb);box-shadow:0 8px 20px #2563eb47}.suggestions{display:flex;margin-top:18px;flex-wrap:wrap;justify-content:center;gap:9px}.suggestions button{padding:7px 13px;border:1px solid #7b97b92e;border-radius:999px;background:#ffffffbd;color:#66748a;cursor:pointer;font-size:13px;transition:.16s}.suggestions button:hover,.suggestions button.active{border-color:#56b9c2;color:#0e8f85;transform:translateY(-1px)}.app-section{padding:72px 4px 10px}.app-section--featured{padding-bottom:50px}.section-heading{display:flex;margin-bottom:24px;align-items:flex-end;justify-content:space-between;gap:24px}.section-heading span{color:#168c83;font-size:11px;font-weight:800;letter-spacing:.14em}.section-heading h2{margin:4px 0 2px;font-size:30px;letter-spacing:-.03em}.section-heading p{margin:0;color:var(--muted)}.app-search{width:260px}.app-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px}.app-card{overflow:hidden;border:1px solid #e5eaf2;border-radius:16px;background:#fff;box-shadow:0 10px 28px #24416812;transition:.18s}.app-card:hover,.app-card:focus-within{outline:0;box-shadow:0 18px 38px #24416826;transform:translateY(-4px)}.app-card__cover{position:relative;height:196px;overflow:hidden;background:#eef3f9}.app-card__cover:after{position:absolute;inset:0;background:linear-gradient(180deg,#10213b24,#10213bbd);content:'';opacity:0;transition:opacity .2s}.app-card__cover img{width:100%;height:100%;object-fit:cover;object-position:top;transition:transform .35s}.app-card:hover .app-card__cover img,.app-card:focus-within .app-card__cover img{transform:scale(1.025)}.app-card__cover>b{position:absolute;z-index:3;top:12px;right:12px;padding:5px 9px;border-radius:8px;background:#14213dd1;color:white;font-size:11px;transition:opacity .2s}.app-card__cover>.featured-tag{background:#0e8f85e0}.app-card__actions{position:absolute;z-index:4;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;opacity:0;pointer-events:none;transform:translateY(8px);transition:opacity .2s,transform .2s}.app-card:hover .app-card__cover:after,.app-card:focus-within .app-card__cover:after{opacity:1}.app-card:hover .app-card__actions,.app-card:focus-within .app-card__actions{opacity:1;pointer-events:auto;transform:translateY(0)}.app-card:hover .app-card__cover>b,.app-card:focus-within .app-card__cover>b{opacity:0}.card-action{display:inline-flex;width:132px;min-height:38px;align-items:center;justify-content:center;gap:7px;border:1px solid transparent;border-radius:999px;box-shadow:0 8px 20px #0713262e;cursor:pointer;font-size:14px;font-weight:700;transition:transform .15s,box-shadow .15s,background .15s}.card-action:hover{box-shadow:0 10px 24px #07132647;transform:translateY(-1px)}.card-action:focus-visible{outline:3px solid #8bc6ff;outline-offset:2px}.card-action--work{border-color:#ffffff5c;background:#17243be8;color:#fff}.card-action--work:hover{background:#0f192a}.card-action--chat{border-color:#dfe6ef;background:#fffffff2;color:#17243b}.card-action--chat:hover{background:#fff}.app-card__placeholder{display:flex;height:100%;align-items:center;justify-content:center;background:linear-gradient(135deg,#dceeff,#d9faf3);color:#1f5fae;flex-direction:column;gap:8px}.app-card__placeholder.featured{background:linear-gradient(135deg,#e7f7f4,#e8edff);color:#118b80}.app-card__placeholder span{display:grid;width:62px;height:62px;place-items:center;border-radius:18px;background:#ffffffb3;box-shadow:0 10px 30px #1c59961f;font-size:28px;font-weight:800}.app-card__placeholder small{font-size:10px;font-weight:700;letter-spacing:.15em;opacity:.65}.app-card__body{padding:16px 18px 18px}.app-card__body h3{margin:0 0 7px;overflow:hidden;font-size:17px;text-overflow:ellipsis;white-space:nowrap}.app-card__body p{display:-webkit-box;min-height:42px;margin:0 0 13px;overflow:hidden;color:var(--muted);font-size:13px;line-height:1.6;-webkit-box-orient:vertical;-webkit-line-clamp:2}.app-card__body>span{display:inline-flex;align-items:center;gap:6px;color:#97a1b2;font-size:12px}.empty-state{padding:48px 20px;border:1px dashed #ccd7e5;border-radius:18px;background:#fff;text-align:center}.empty-state__icon{display:grid;width:50px;height:50px;margin:0 auto 12px;place-items:center;border-radius:15px;background:#eaf7f5;color:#14998c;font-size:22px}.empty-state h3{margin:0 0 5px}.empty-state p{margin:0 0 16px;color:var(--muted)}.app-section :deep(.ant-pagination){margin-top:28px;justify-content:center}@media(max-width:920px){.app-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:620px){.hero{min-height:0;border-radius:22px}.hero__content{width:calc(100% - 28px);padding:42px 0 34px}.hero h1{font-size:36px}.prompt-box__footer>span{display:none}.prompt-box__footer{justify-content:flex-end}.app-section{padding-top:52px}.section-heading{align-items:stretch;flex-direction:column;gap:16px}.app-search{width:100%}.app-grid{grid-template-columns:1fr}}@media(hover:none){.app-card__cover:after{opacity:.64;background:linear-gradient(180deg,transparent 35%,#10213bc7)}.app-card__actions{inset:auto 12px 12px;align-items:stretch;opacity:1;pointer-events:auto;transform:none}.card-action{width:100%}.app-card__cover>b{opacity:1}.app-card__actions:has(.card-action--work){display:grid;grid-template-columns:1fr 1fr;flex-direction:row}.app-card__actions:has(.card-action--work) .card-action{font-size:13px}}@media(prefers-reduced-motion:reduce){.prompt-box,.app-card,.suggestions button,.app-card__cover img,.app-card__cover:after,.app-card__actions,.card-action{transition:none}}
+.home-page {
+  --ink: #1d2b45;
+  --muted: #68758d;
+  position: relative;
+  isolation: isolate;
+  overflow-x: clip;
+  padding-bottom: 52px;
+  color: var(--ink);
+}
+.hero {
+  position: relative;
+  min-height: 475px;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.hero::after {
+  position: absolute;
+  right: -4%;
+  bottom: 2%;
+  width: 41%;
+  height: 40%;
+  border-radius: 50%;
+  background: repeating-radial-gradient(circle, transparent 0 16px, rgb(86 108 205 / 8%) 17px 18px);
+  content: '';
+  mask-image: linear-gradient(180deg, #000, transparent 90%);
+  pointer-events: none;
+}
+.hero__glow {
+  position: absolute;
+  z-index: 0;
+  border-radius: 50%;
+  filter: blur(32px);
+  opacity: 0.64;
+  pointer-events: none;
+  animation: drift-glow 20s ease-in-out infinite alternate;
+}
+.hero__glow--one {
+  top: -45px;
+  right: 0;
+  width: 360px;
+  height: 300px;
+  background: #c7f1e9;
+}
+.hero__glow--two {
+  bottom: 4px;
+  left: 5%;
+  width: 400px;
+  height: 280px;
+  background: #dadfff;
+  animation-delay: -9s;
+}
+.hero__content {
+  position: relative;
+  z-index: 1;
+  width: min(860px, calc(100% - 48px));
+  margin: auto;
+  padding: 78px 0 54px;
+  text-align: center;
+}
+.hero h1 {
+  margin: 0 0 16px;
+  background: linear-gradient(100deg, #236d83 0%, #365f96 56%, #526bb0 100%);
+  background-clip: text;
+  color: transparent;
+  font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  font-size: clamp(38px, 5vw, 64px);
+  font-weight: 750;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+}
+.hero__content > p {
+  margin: 0 0 32px;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.7;
+}
+.prompt-box {
+  padding: 17px 18px 13px 22px;
+  border: 0;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 22px 55px rgb(69 87 160 / 16%);
+  text-align: left;
+  transition:
+    box-shadow 0.18s,
+    transform 0.18s;
+}
+.prompt-box:focus-within {
+  box-shadow: 0 26px 62px rgb(78 102 192 / 23%);
+  transform: translateY(-2px);
+}
+.prompt-box__input,
+.prompt-box__input:focus,
+.prompt-box :deep(textarea),
+.prompt-box :deep(textarea:focus) {
+  padding: 6px 2px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 16px;
+  resize: none;
+}
+.prompt-box :deep(textarea::placeholder) {
+  color: #98a7bc;
+}
+.prompt-box__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #8190a5;
+  font-size: 12px;
+}
+.prompt-box__footer :deep(.ant-btn) {
+  border: 0;
+  background: linear-gradient(135deg, #176bd4, #5259da);
+  box-shadow: 0 8px 20px rgb(46 95 217 / 27%);
+}
+.suggestions {
+  display: flex;
+  margin-top: 18px;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 9px;
+}
+.suggestions button {
+  padding: 7px 13px;
+  border: 1px solid rgb(101 121 183 / 19%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 75%);
+  color: #596983;
+  cursor: pointer;
+  font-size: 13px;
+  transition:
+    border-color 0.16s,
+    color 0.16s,
+    transform 0.16s;
+}
+.suggestions button:hover,
+.suggestions button.active {
+  border-color: #8b9de6;
+  background: #fff;
+  color: #4d62bd;
+  transform: translateY(-1px);
+}
+.suggestions button:focus-visible {
+  outline: 2px solid #8b9de6;
+  outline-offset: 3px;
+}
+.app-section {
+  position: relative;
+  width: min(1200px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 38px 40px 42px;
+  border: 1px solid rgb(255 255 255 / 85%);
+  border-radius: 28px;
+  background: rgb(255 255 255 / 97%);
+  box-shadow: 0 28px 70px rgb(63 82 148 / 13%);
+}
+.app-section--featured {
+  margin: 28px auto 0;
+}
+.section-heading {
+  display: flex;
+  margin-bottom: 26px;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+}
+.section-heading h2 {
+  margin: 0 0 2px;
+  color: var(--ink);
+  font-size: 30px;
+  letter-spacing: -0.03em;
+}
+.section-heading p {
+  margin: 0;
+  color: var(--muted);
+}
+.app-search {
+  width: 260px;
+}
+.app-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+}
+.empty-state {
+  padding: 48px 20px;
+  border: 1px dashed #ccd7e5;
+  border-radius: 18px;
+  background: #fff;
+  text-align: center;
+}
+.empty-state__icon {
+  display: grid;
+  width: 50px;
+  height: 50px;
+  margin: 0 auto 12px;
+  place-items: center;
+  border-radius: 15px;
+  background: #eaf7f5;
+  color: #14998c;
+  font-size: 22px;
+}
+.empty-state h3 {
+  margin: 0 0 5px;
+}
+.empty-state p {
+  margin: 0 0 16px;
+  color: var(--muted);
+}
+.app-section :deep(.ant-pagination) {
+  margin-top: 28px;
+  justify-content: center;
+}
+@keyframes drift-glow {
+  from {
+    transform: translate3d(-12px, 7px, 0);
+  }
+  to {
+    transform: translate3d(16px, -9px, 0);
+  }
+}
+@media (max-width: 920px) {
+  .app-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .app-section {
+    padding: 32px 28px 36px;
+  }
+}
+@media (max-width: 620px) {
+  .hero {
+    min-height: 0;
+  }
+  .hero__content {
+    width: calc(100% - 32px);
+    padding: 54px 0 46px;
+  }
+  .hero h1 {
+    font-size: 36px;
+  }
+  .hero__content > p {
+    font-size: 14px;
+  }
+  .hero__glow {
+    opacity: 0.24;
+  }
+  .prompt-box {
+    padding: 14px;
+  }
+  .prompt-box__footer > span {
+    display: none;
+  }
+  .prompt-box__footer {
+    justify-content: flex-end;
+  }
+  .app-section {
+    width: calc(100% - 28px);
+    padding: 24px 18px 28px;
+    border-radius: 21px;
+  }
+  .app-section--featured {
+    margin-top: 20px;
+  }
+  .section-heading {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .app-search {
+    width: 100%;
+  }
+  .app-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero__glow {
+    animation: none;
+  }
+  .prompt-box,
+  .suggestions button {
+    transition: none;
+  }
+}
 </style>
