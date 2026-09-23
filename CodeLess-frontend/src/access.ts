@@ -18,10 +18,15 @@ router.beforeEach(async (to, from, next) => {
     firstFetchLoginUser = false
   }
   const toUrl = to.fullPath
+  if (to.meta.requiresAuth && !loginUser.id) {
+    message.warning('请先登录后再访问个人中心')
+    next(`/user/login?redirect=${encodeURIComponent(to.fullPath)}`)
+    return
+  }
   if (toUrl.startsWith('/admin')) {
     if (!loginUser || loginUser.userRole !== 'admin') {
       message.error('没有权限')
-      next(`/user/login?redirect=${to.fullPath}`)
+      next(`/user/login?redirect=${encodeURIComponent(to.fullPath)}`)
       return
     }
   }

@@ -144,7 +144,7 @@ public class AppController {
     }
 
     /**
-     * 更新应用（用户只能更新自己的应用名称）
+     * 更新应用（用户只能更新自己的应用名称和封面）
      *
      * @param appUpdateRequest 更新请求
      * @param request          请求
@@ -167,6 +167,7 @@ public class AppController {
         App app = new App();
         app.setId(id);
         app.setAppName(appUpdateRequest.getAppName());
+        app.setCover(appUpdateRequest.getCover());
         // 设置编辑时间
         app.setEditTime(LocalDateTime.now());
         boolean result = appService.updateById(app);

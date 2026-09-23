@@ -3,6 +3,7 @@ package com.hjq.CodeLess.service;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
 import com.hjq.CodeLess.model.dto.user.UserQueryRequest;
+import com.hjq.CodeLess.model.dto.user.UserUpdateMyRequest;
 import com.hjq.CodeLess.model.vo.LoginUserVO;
 import com.hjq.CodeLess.model.vo.UserVO;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -95,6 +96,16 @@ public interface UserService extends IService<User> {
      * @return 加密后的密码
      */
     String getEncryptPassword(String userPassword);
+
+    /**
+     * 当前登录用户修改个人资料。
+     */
+    boolean updateMyProfile(UserUpdateMyRequest userUpdateMyRequest, HttpServletRequest request);
+
+    /**
+     * 当前登录用户修改密码。
+     */
+    boolean changePassword(String currentPassword, String newPassword, HttpServletRequest request);
 
 
 

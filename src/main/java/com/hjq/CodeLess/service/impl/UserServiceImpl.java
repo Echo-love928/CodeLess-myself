@@ -3,10 +3,12 @@ package com.hjq.CodeLess.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.crypto.digest.BCrypt;
 import com.hjq.CodeLess.exception.BusinessException;
 import com.hjq.CodeLess.exception.ErrorCode;
 import com.hjq.CodeLess.mapper.AppMapper;
 import com.hjq.CodeLess.model.dto.user.UserQueryRequest;
+import com.hjq.CodeLess.model.dto.user.UserUpdateMyRequest;
 import com.hjq.CodeLess.model.entity.App;
 import com.hjq.CodeLess.model.enums.UserRoleEnum;
 import com.hjq.CodeLess.model.vo.AppVO;
@@ -22,6 +24,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -93,16 +96,20 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>  implements U
         if (userPassword.length() < 8) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "密码错误");
         }
-        // 2. 加密
-        String encryptPassword = getEncryptPassword(userPassword);
-        // 查询用户是否存在
+        // 2. 根据账号查询用户，再校验带随机盐的密码哈希
         QueryWrapper queryWrapper = new QueryWrapper();
         queryWrapper.eq("userAccount", userAccount);
-        queryWrapper.eq("userPassword", encryptPassword);
         User user = this.mapper.selectOneByQuery(queryWrapper);
         // 用户不存在
-        if (user == null) {
+        if (user == null || !matchesPassword(userPassword, user.getUserPassword())) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户不存在或密码错误");
+        }
+        // 兼容历史 MD5 密码：用户成功登录时自动升级为 BCrypt
+        if (!isBcryptHash(user.getUserPassword())) {
+            User passwordUpgrade = new User();
+            passwordUpgrade.setId(user.getId());
+            passwordUpgrade.setUserPassword(getEncryptPassword(userPassword));
+            this.updateById(passwordUpgrade);
         }
         // 3. 记录用户的登录态
         request.getSession().setAttribute(USER_LOGIN_STATE, user);
@@ -182,9 +189,103 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>  implements U
 
     @Override
     public String getEncryptPassword(String userPassword) {
-        // 盐值，混淆密码
-        final String SALT = "codeless";
-        return DigestUtils.md5DigestAsHex((SALT + userPassword).getBytes());
+        return BCrypt.hashpw(userPassword, BCrypt.gensalt());
+    }
+
+    @Override
+    public boolean updateMyProfile(UserUpdateMyRequest userUpdateMyRequest, HttpServletRequest request) {
+        if (userUpdateMyRequest == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "请求参数为空");
+        }
+        String userName = StrUtil.trim(userUpdateMyRequest.getUserName());
+        String userAvatar = StrUtil.trim(userUpdateMyRequest.getUserAvatar());
+        String userProfile = StrUtil.trim(userUpdateMyRequest.getUserProfile());
+        if (StrUtil.isBlank(userName)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "昵称不能为空");
+        }
+        if (userName.length() > 50) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "昵称最多 50 个字符");
+        }
+        if (userAvatar != null && userAvatar.length() > 1024) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "头像地址过长");
+        }
+        if (StrUtil.isNotBlank(userAvatar) && !isHttpUrl(userAvatar)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "头像地址必须使用 HTTP 或 HTTPS 协议");
+        }
+        if (userProfile != null && userProfile.length() > 500) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "个人简介最多 500 个字符");
+        }
+
+        User loginUser = getLoginUser(request);
+        User user = new User();
+        user.setId(loginUser.getId());
+        user.setUserName(userName);
+        user.setUserAvatar(userAvatar);
+        user.setUserProfile(userProfile);
+        boolean result = this.updateById(user);
+        if (!result) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "个人资料保存失败");
+        }
+        return true;
+    }
+
+    @Override
+    public boolean changePassword(String currentPassword, String newPassword, HttpServletRequest request) {
+        if (StrUtil.hasBlank(currentPassword, newPassword)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "密码不能为空");
+        }
+        if (currentPassword.length() < 8 || currentPassword.length() > 64
+                || newPassword.length() < 8 || newPassword.length() > 64) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "密码长度应为 8～64 位");
+        }
+        if (currentPassword.equals(newPassword)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "新密码不能与当前密码相同");
+        }
+
+        User loginUser = getLoginUser(request);
+        if (!matchesPassword(currentPassword, loginUser.getUserPassword())) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "当前密码错误");
+        }
+
+        User user = new User();
+        user.setId(loginUser.getId());
+        user.setUserPassword(getEncryptPassword(newPassword));
+        boolean result = this.updateById(user);
+        if (!result) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "密码修改失败");
+        }
+        request.getSession().invalidate();
+        return true;
+    }
+
+    private boolean matchesPassword(String rawPassword, String storedPassword) {
+        if (StrUtil.isBlank(storedPassword)) {
+            return false;
+        }
+        if (isBcryptHash(storedPassword)) {
+            return BCrypt.checkpw(rawPassword, storedPassword);
+        }
+        final String legacySalt = "codeless";
+        String legacyHash = DigestUtils.md5DigestAsHex((legacySalt + rawPassword).getBytes());
+        return legacyHash.equals(storedPassword);
+    }
+
+    private boolean isBcryptHash(String passwordHash) {
+        return passwordHash != null
+                && (passwordHash.startsWith("$2a$")
+                || passwordHash.startsWith("$2b$")
+                || passwordHash.startsWith("$2y$"));
+    }
+
+    private boolean isHttpUrl(String value) {
+        try {
+            URI uri = URI.create(value);
+            String scheme = uri.getScheme();
+            return uri.getHost() != null
+                    && ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme));
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
     }
 
 }

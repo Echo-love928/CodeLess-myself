@@ -32,6 +32,7 @@ declare namespace API {
   type AppUpdateRequest = {
     id?: string
     appName?: string
+    cover?: string
   }
 
   type AppVO = {
@@ -188,6 +189,17 @@ declare namespace API {
   type UserLoginRequest = {
     userAccount?: string
     userPassword?: string
+  }
+
+  type UserUpdateMyRequest = {
+    userName?: string
+    userAvatar?: string
+    userProfile?: string
+  }
+
+  type UserChangePasswordRequest = {
+    currentPassword?: string
+    newPassword?: string
   }
 
   type UserQueryRequest = {

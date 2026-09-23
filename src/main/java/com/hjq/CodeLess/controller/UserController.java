@@ -157,6 +157,32 @@ public class UserController {
     }
 
     /**
+     * 当前登录用户修改个人资料。
+     */
+    @PostMapping("/update/my")
+    public BaseResponse<Boolean> updateMyProfile(@RequestBody UserUpdateMyRequest userUpdateMyRequest,
+                                                 HttpServletRequest request) {
+        ThrowUtils.throwIf(userUpdateMyRequest == null, ErrorCode.PARAMS_ERROR);
+        boolean result = userService.updateMyProfile(userUpdateMyRequest, request);
+        return ResultUtils.success(result);
+    }
+
+    /**
+     * 当前登录用户修改密码。成功后当前会话失效，需要重新登录。
+     */
+    @PostMapping("/change-password")
+    public BaseResponse<Boolean> changePassword(@RequestBody UserChangePasswordRequest userChangePasswordRequest,
+                                                HttpServletRequest request) {
+        ThrowUtils.throwIf(userChangePasswordRequest == null, ErrorCode.PARAMS_ERROR);
+        boolean result = userService.changePassword(
+                userChangePasswordRequest.getCurrentPassword(),
+                userChangePasswordRequest.getNewPassword(),
+                request
+        );
+        return ResultUtils.success(result);
+    }
+
+    /**
      * 分页获取用户封装列表（仅管理员）
      *
      * @param userQueryRequest 查询请求参数
@@ -177,4 +203,3 @@ public class UserController {
     }
 
 }
-

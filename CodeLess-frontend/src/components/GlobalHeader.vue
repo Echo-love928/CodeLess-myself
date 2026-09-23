@@ -4,7 +4,7 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useLoginUserStore } from '@/stores/loginUser.ts'
 import logoUrl from '@/assets/logo.png'
-import { LogoutOutlined } from '@ant-design/icons-vue'
+import { DownOutlined, LogoutOutlined, UserOutlined } from '@ant-design/icons-vue'
 import { userLogout } from '@/api/userController.ts'
 
 //获取登录用户状态
@@ -60,13 +60,17 @@ const handleLoginClick = () => {
   void router.push('/user/login')
 }
 
+const handleUserMenuClick: MenuProps['onClick'] = ({ key }) => {
+  if (key === 'profile') {
+    void router.push('/account/profile')
+  }
+}
+
 // 用户注销
 const doLogout = async () => {
   const res = await userLogout()
   if (res.data.code === 0) {
-    loginUserStore.setLoginUser({
-      userName: '未登录',
-    })
+    loginUserStore.resetLoginUser()
     message.success('退出登录成功')
     await router.push('/user/login')
   } else {
@@ -94,8 +98,8 @@ const doLogout = async () => {
         />
       </nav>
       <div class="global-header__user">
-        <a-dropdown v-if="loginUserStore.loginUser.id">
-          <div class="global-header__user-trigger">
+        <a-dropdown v-if="loginUserStore.loginUser.id" :trigger="['hover', 'click']">
+          <button class="global-header__user-trigger" type="button" aria-label="打开账户菜单">
             <a-avatar class="global-header__avatar" :src="loginUserStore.loginUser.userAvatar">
               {{ loginUserStore.loginUser.userName?.slice(0, 1) || '用' }}
             </a-avatar>
@@ -103,10 +107,16 @@ const doLogout = async () => {
             <span class="global-header__username">
               {{ loginUserStore.loginUser.userName || '无名' }}
             </span>
-          </div>
+            <DownOutlined class="global-header__chevron" />
+          </button>
           <template #overlay>
-            <a-menu>
-              <a-menu-item @click="doLogout">
+            <a-menu class="global-header__user-menu" @click="handleUserMenuClick">
+              <a-menu-item key="profile">
+                <UserOutlined />
+                个人中心
+              </a-menu-item>
+              <a-menu-divider />
+              <a-menu-item key="logout" @click="doLogout">
                 <LogoutOutlined />
                 退出登录
               </a-menu-item>
@@ -229,10 +239,25 @@ const doLogout = async () => {
 }
 
 .global-header__user-trigger {
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
   display: flex;
+  padding: 6px 8px;
   align-items: center;
   gap: 10px;
   cursor: pointer;
+  transition: background-color 180ms ease;
+}
+
+.global-header__user-trigger:hover,
+.global-header__user-trigger:focus-visible {
+  background: #f1f6ff;
+}
+
+.global-header__user-trigger:focus-visible {
+  outline: 2px solid #4c9aff;
+  outline-offset: 2px;
 }
 
 .global-header__avatar {
@@ -249,6 +274,16 @@ const doLogout = async () => {
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.global-header__chevron {
+  color: #91a0b8;
+  font-size: 11px;
+}
+
+.global-header__user-menu {
+  min-width: 148px;
+  padding: 6px;
 }
 
 .global-header__login {
